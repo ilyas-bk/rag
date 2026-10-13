@@ -7,7 +7,6 @@ class CLI:
         build_repository_index(max_chars)
 
 
-
 def main():
     fire.Fire(CLI)
 

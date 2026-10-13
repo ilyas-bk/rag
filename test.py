@@ -8,4 +8,3 @@ if __name__ == "__main__":
 	tokens = model.encode("decapsulation")
 	print(tokens.tolist())
 
-

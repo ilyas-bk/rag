@@ -20,9 +20,9 @@ def is_text_file(filepath: Path, sample_size: int = 1024) -> bool:
         with open(filepath, "rb") as f:
             chunk = f.read(sample_size)
             if not chunk:
-                return True  # Empty files are safely readable
+                return True
             if b"\x00" in chunk:
-                return False  # Null bytes indicate binary data
+                return False
             chunk.decode("utf-8")
             return True
     except (OSError, UnicodeDecodeError):
@@ -48,3 +48,4 @@ if __name__ == "__main__":
     valid_exts = get_text_extensions(".")
     print("Detected text extensions:")
     print(valid_exts)
+

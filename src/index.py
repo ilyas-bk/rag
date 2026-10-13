@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from typing import Callable
 from tqdm import tqdm
 
-from text_ext import is_text_file
+from src.text_ext import is_text_file
 
 
 REPO_PATH = "data/raw/vllm-0.10.1"
@@ -134,10 +134,10 @@ def build_bm25(chunks: list[dict]) -> dict:
             postings[term][i] = tf
 
     return {
-        "N": len(chunks),
-        "avgdl": sum(lengths) / len(lengths),
-        "lengths": lengths,
-        "postings": postings,
+        "N": len(chunks), # number of chunks
+        "avgdl": sum(lengths) / len(lengths), # average chunk len
+        "lengths": lengths, # chunks lengths
+        "postings": postings, # revert indexed chunks
     }
 
 
