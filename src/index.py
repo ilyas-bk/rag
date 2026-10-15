@@ -23,11 +23,12 @@ def split_by_lines(
     is_boundary: Callable[[str], bool],
     min_fill: float = 0.5,
 ) -> list[dict]:
-    """Group lines into chunks of at most ~max_chars.
+    """Group lines into chunks of at most max_chars.
 
     A new chunk starts when adding the line would overflow, or when the line
     is a "natural boundary" (def/class, heading, blank line...) and the
-    current chunk is already at least min_fill full.
+    current chunk is already at least min_fill full. A single line longer
+    than max_chars is cut into max_chars-sized pieces.
     """
     chunks = []
     chunk_start = 0
@@ -42,6 +43,11 @@ def split_by_lines(
             chunks.append({"start": chunk_start, "end": pos,
                            "text": text[chunk_start:pos]})
             chunk_start = pos
+        while pos + len(line) - chunk_start > max_chars:
+            cut = chunk_start + max_chars
+            chunks.append({"start": chunk_start, "end": cut,
+                           "text": text[chunk_start:cut]})
+            chunk_start = cut
         pos += len(line)
 
     if chunk_start < len(text):
