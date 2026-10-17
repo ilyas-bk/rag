@@ -143,11 +143,12 @@ def build_bm25(chunks: list[dict]) -> dict:
     }
 
 
-# 3. Build + save
+# 3. Build + save (action)
 
 def build_repository_index(max_chars: int = MAX_CHARS,
                            repo_path: str = REPO_PATH,
                            index_dir: str = INDEX_DIR) -> None:
+    # get valid files
     file_paths = []
     for root, _, files in os.walk(repo_path):
         for f in files:
@@ -163,8 +164,10 @@ def build_repository_index(max_chars: int = MAX_CHARS,
     bm25 = build_bm25(chunks)
 
     os.makedirs(index_dir, exist_ok=True)
+    # save raw chunks
     with open(os.path.join(index_dir, "chunks.json"), "w") as f:
         json.dump(chunks, f, indent=2)
+    # save bm25 data
     with open(os.path.join(index_dir, "bm25.json"), "w") as f:
         json.dump(bm25, f, indent=2)
     print(f"Ingestion complete! Indexed {len(chunks)} chunks under {index_dir}/")
