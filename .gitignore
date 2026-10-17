@@ -1,5 +1,6 @@
 .venv/
 __pycache__/
+.vscode/
 
 data/processed/bm25.json
 data/processed/chunks.json

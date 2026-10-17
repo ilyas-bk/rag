@@ -4,7 +4,6 @@ from pathlib import Path
 
 def is_text_file(filepath: Path, sample_size: int = 1024) -> bool:
     """Check if a file is readable text by MIME type and byte inspection."""
-    # 1. Quick check using standard MIME types
     mime_type, _ = mimetypes.guess_type(filepath)
     if mime_type:
         if mime_type.startswith("text/") or mime_type in (
@@ -15,7 +14,6 @@ def is_text_file(filepath: Path, sample_size: int = 1024) -> bool:
         ):
             return True
 
-    # 2. Fallback: Read initial bytes to check for null bytes or UTF-8 decoding
     try:
         with open(filepath, "rb") as f:
             chunk = f.read(sample_size)
@@ -35,7 +33,6 @@ def get_text_extensions(directory: str = ".") -> set[str]:
     root_path = Path(directory)
 
     for path in root_path.rglob("*"):
-        # Ignore directories and hidden files/folders (e.g., .git)
         if path.is_file() and not path.name.startswith("."):
             ext = path.suffix.lower()
             if ext and is_text_file(path):

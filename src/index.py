@@ -13,9 +13,7 @@ INDEX_DIR = "data/processed"
 MAX_CHARS = 2000
 
 
-# ---------------------------------------------------------------------------
 # 1. Chunking (every chunk keeps its character offsets in the original file)
-# ---------------------------------------------------------------------------
 
 def split_by_lines(
     text: str,
@@ -108,9 +106,7 @@ def process_file(args: tuple[str, int]) -> list[dict]:
     ]
 
 
-# ---------------------------------------------------------------------------
 # 2. BM25 index
-# ---------------------------------------------------------------------------
 
 def tokenize(text: str) -> list[str]:
     """Code-aware tokenizer: keeps whole identifiers and their sub-words.
@@ -147,9 +143,7 @@ def build_bm25(chunks: list[dict]) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
 # 3. Build + save
-# ---------------------------------------------------------------------------
 
 def build_repository_index(max_chars: int = MAX_CHARS,
                            repo_path: str = REPO_PATH,
