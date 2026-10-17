@@ -53,10 +53,13 @@ class BM25Retriever:
 
         scores: dict[int, float] = {}
         for term in set(tokenize(query)):
+            # get the valid chunks
             docs = self.postings.get(term)
             if docs is None:
                 continue
+            # calculate idf
             idf = self.idf[term]
+            # calculate bm25
             for cid, tf in docs.items():
                 norm = 1 - self.b + self.b * self.lengths[cid] / self.avgdl
                 score = idf * tf * (self.k1 + 1) / (tf + self.k1 * norm)
