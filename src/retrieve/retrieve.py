@@ -2,7 +2,9 @@ import json
 import math
 import os
 
-from src.index import INDEX_DIR, tokenize
+from src import INDEX_DIR
+from src.utils import tokenize
+
 
 
 class BM25Retriever:
@@ -35,7 +37,6 @@ class BM25Retriever:
         self.b = b
         self.avgdl: float = bm25["avgdl"]
         self.lengths: list[int] = bm25["lengths"]
-        # JSON turned the chunk ids into strings, convert them back once
         self.postings: dict[str, dict[int, int]] = {
             term: {int(cid): tf for cid, tf in docs.items()}
             for term, docs in bm25["postings"].items()
@@ -53,13 +54,10 @@ class BM25Retriever:
 
         scores: dict[int, float] = {}
         for term in set(tokenize(query)):
-            # get the valid chunks
             docs = self.postings.get(term)
             if docs is None:
                 continue
-            # calculate idf
             idf = self.idf[term]
-            # calculate bm25
             for cid, tf in docs.items():
                 norm = 1 - self.b + self.b * self.lengths[cid] / self.avgdl
                 score = idf * tf * (self.k1 + 1) / (tf + self.k1 * norm)
