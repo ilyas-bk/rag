@@ -9,8 +9,10 @@ from src.data import (
     AnsweredQuestion,
     MinimalSearchResults,
     MinimalSource,
+    MinimalAnswer,
     RagDataset,
     StudentSearchResults,
+    StudentSearchResultsAndAnswer,
 )
 from src.index import build_repository_index
 from src.retrieve import BM25Retriever
@@ -89,9 +91,39 @@ class CLI:
         with open(save_path, "w") as f:
             f.write(output.model_dump_json(indent=2))
         print(f"Saved student_search_results to {save_path}")
-    
+
+
     def answer(self, query: str = "", k: int = 5):
-        generate_response(query, k)
+        result = generate_response(query, k)
+        print(result)
+
+
+    def answer_dataset(self, student_search_results_path: str,
+                       save_directory: str) -> None:
+        """Generate answers for a dataset, producing a StudentSearchResultsAndAnswer JSON file."""
+        try:
+            with open(student_search_results_path) as f:
+                results = StudentSearchResults.model_validate(json.load(f))
+        except (OSError, json.JSONDecodeError, ValidationError) as e:
+            print(f"Error: could not load {student_search_results_path}: {e}")
+            return
+
+        search_results = []
+        for r in results.search_results:
+            answer = generate_response(r.question, k=len(r.retrieved_sources))
+            search_results.append(MinimalAnswer(
+                question_id=r.question_id,
+                question=r.question,
+                retrieved_sources=r.retrieved_sources,
+                answer=answer
+            ))
+        k = len(search_results)
+        output = StudentSearchResultsAndAnswer(search_results=search_results, k=k)
+        os.makedirs(save_directory, exist_ok=True)
+        save_path = os.path.join(save_directory, os.path.basename(student_search_results_path))
+        with open(save_path, "w") as f:
+            f.write(output.model_dump_json(indent=2))
+        print(f"Saved student_search_results_and_answer to {save_path}")
 
 
     def evaluate(self, student_search_results_path: str, dataset_path: str,

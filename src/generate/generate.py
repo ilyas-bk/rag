@@ -1,12 +1,12 @@
-
-import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
 )
+import json
+from pydantic import ValidationError
 
 from src.retrieve import BM25Retriever
-
+from src.data import StudentSearchResults
 
 def search(query: str = "", k: int = 5) -> list[dict]:
     """Print the top-k sources for a single query."""
@@ -23,7 +23,7 @@ def search(query: str = "", k: int = 5) -> list[dict]:
 
 
 
-def generate_response(query: str = "", k: int = 5) -> str:
+def generate_response(query: str = "", k: int = 5, dataset_path: str = "") -> str:
     query = "How to configure OpenAI server?"
     if not str(query).strip():
         print("Error: the query is empty")
@@ -33,8 +33,12 @@ def generate_response(query: str = "", k: int = 5) -> str:
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name)
 
-
-    chunks = search(query, k)
+    try:
+        with open(dataset_path) as f:
+            dataset = StudentSearchResults.model_validate(json.load(f))
+            results = dataset.search_results
+    except (OSError, json.JSONDecodeError, ValidationError, FileNotFoundError):
+        chunks = search(query, k)
 
     formatted_context = "\n\n".join([f"Context Block {i+1}:\n{chunk['text']}" for i, chunk in enumerate(chunks)])
 
@@ -57,9 +61,8 @@ def generate_response(query: str = "", k: int = 5) -> str:
         messages,
         tokenize=False,
         add_generation_prompt=True,
-        enable_thinking=False,
+        enable_thinking=True,
     )
-    print(text)
 
     model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
@@ -75,8 +78,6 @@ def generate_response(query: str = "", k: int = 5) -> str:
     except ValueError:
         index = 0
 
-    thinking_content = tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip("\n")
     content = tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
 
-    print("Thinking content: ", thinking_content)
-    print("Content:", content)
+    return content
