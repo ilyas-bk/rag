@@ -14,6 +14,7 @@ from src.data import (
 )
 from src.index import build_repository_index
 from src.retrieve import BM25Retriever
+from src.generate import generate_response
 
 
 def to_source(chunk: dict) -> MinimalSource:
@@ -57,6 +58,7 @@ class CLI:
         results = retriever.search(str(query), k)
         if not results:
             print("No results")
+        print(results)
         for chunk in results:
             print(f"{chunk['file']} [{chunk['start']}:{chunk['end']}]")
 
@@ -87,6 +89,10 @@ class CLI:
         with open(save_path, "w") as f:
             f.write(output.model_dump_json(indent=2))
         print(f"Saved student_search_results to {save_path}")
+    
+    def answer(self, query: str = "", k: int = 5):
+        generate_response(query, k)
+
 
     def evaluate(self, student_search_results_path: str, dataset_path: str,
                  iou_threshold: float = 0.05) -> None:

@@ -3,103 +3,80 @@ import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    PreTrainedTokenizer,
-    PreTrainedModel,
-    logging
 )
 
-
-logging.set_verbosity_error()
-
-
-class Small_LLM_Model:
-    """Utility class wrapping a lightweight Hugging Face causal-LM for fast, low-memory experimentation.
-
-    Parameters
-    ----------
-    model_name: str, default="Qwen/Qwen3-0.6B"
-        Identifier of the model on the HF Hub.
-    device: str | None, default=None
-        Computation device. If *None* we automatically select ``mps`` when available on macOS,
-        ``cuda`` when available, otherwise we fall back to ``cpu``.
-    dtype: torch.dtype | None, default=None
-        Numerical precision. When using a GPU or MPS we default to ``float16`` to keep memory
-        usage reasonable; on CPU we keep ``float32`` for maximum compatibility.
-    """
-
-    def __init__(
-        self,
-        model_name: str = "Qwen/Qwen3-0.6B",
-        *,
-        device: str | None = None,
-        dtype: torch.dtype | None = None,
-        trust_remote_code: bool = True,
-    ) -> None:
-        self._model_name = model_name
-
-        # Auto-select device with priority: mps > cuda > cpu
-        if device is None:
-            if torch.backends.mps.is_available():
-                device = "mps"
-            elif torch.cuda.is_available():
-                device = "cuda"
-            else:
-                device = "cpu"
-        self._device = device
-
-        if dtype is None:
-            dtype = torch.float16 if self._device in ["cuda", "mps"] else torch.float32
-        self._dtype = dtype
-
-        # --- load tokenizer & model -------------------------------------------------
-        self._tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
-            model_name, trust_remote_code=trust_remote_code
-        )
-        if self._tokenizer.pad_token_id is None:
-            # ensure we have a pad token to keep batch helpers happy
-            self._tokenizer.pad_token_id = self._tokenizer.eos_token_id
-
-        self._model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=self._dtype,
-            device_map="auto" if self._device == "cuda" else None,
-            trust_remote_code=trust_remote_code,
-        )
-        self._model.to(self._device)
-        self._model.eval()
-
-        # switch to inference-only mode
-        for p in self._model.parameters():
-            p.requires_grad = False
+from src.retrieve import BM25Retriever
 
 
-    def encode(self, text: str) -> torch.Tensor:
-        """Tokenise *text* and return a 2-D ``input_ids`` tensor on the target device."""
-        ids = self._tokenizer.encode(text, add_special_tokens=False)
-        return torch.tensor([ids], device=self._device, dtype=torch.long)
+def search(query: str = "", k: int = 5) -> list[dict]:
+    """Print the top-k sources for a single query."""
+    try:
+        retriever = BM25Retriever()
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        return
 
-
-    def decode(self, ids: torch.Tensor | list[int]) -> str:
-        """Inverse of :py:meth:`encode`. Removes special tokens."""
-        if isinstance(ids, torch.Tensor):
-            ids = ids.tolist()
-        return self._tokenizer.decode(ids, skip_special_tokens=True)
-
-
-    def get_logits_from_input_ids(self, input_ids: list[int]) -> list[float]:
-        """
-        Given a list of input token ids, return the raw logits (no softmax) for the next token.
-        """
-        input_tensor = torch.tensor([input_ids], device=self._device, dtype=torch.long)
-        with torch.no_grad():
-            out = self._model(input_ids=input_tensor)
-        logits = out.logits[0, -1].tolist()
-        return [float(x) for x in logits]
+    results = retriever.search(str(query), k)
+    if not results:
+        print("No results")
+    return results
 
 
 
+def generate_response(query: str = "", k: int = 5) -> str:
+    query = "How to configure OpenAI server?"
+    if not str(query).strip():
+        print("Error: the query is empty")
+        return
+    model_name = "Qwen/Qwen3-0.6b"
 
-def generate_answer(query: str, k: int) -> str:
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
 
 
+    chunks = search(query, k)
 
+    formatted_context = "\n\n".join([f"Context Block {i+1}:\n{chunk['text']}" for i, chunk in enumerate(chunks)])
+
+    system_prompt = (
+        "You are a helpful assistant. Your task is to answer the user's question using ONLY the provided context.\n\n"
+        "CRITICAL RULES:\n"
+        "1. Rely strictly on clear facts directly mentioned in the context.\n"
+        "2. Do NOT use outside knowledge or make assumptions.\n"
+        "3. If the context is irrelevant or does not contain sufficient evidence to answer the question, "
+        "you MUST reply with exact string: \"couldn't find the answer in the context\".\n\n"
+        f"CONTEXT:\n{formatted_context}"
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": query}
+    ]
+
+    text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    print(text)
+
+    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+    generated_ids = model.generate(
+        **model_inputs,
+        max_new_tokens=32768
+    )
+    output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist()
+
+
+    try:
+        index = len(output_ids) - output_ids[::-1].index(151668)
+    except ValueError:
+        index = 0
+
+    thinking_content = tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip("\n")
+    content = tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
+
+    print("Thinking content: ", thinking_content)
+    print("Content:", content)
