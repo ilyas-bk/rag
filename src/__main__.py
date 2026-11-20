@@ -1,6 +1,7 @@
 from src.cli import CLI
 import fire
 
+
 def main() -> None:
     fire.Fire(CLI)
 

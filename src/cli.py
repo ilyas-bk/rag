@@ -16,7 +16,7 @@ from src.data import (
 )
 from src.index import build_repository_index
 from src.retrieve import BM25Retriever
-from src.generate import generate_response
+from src.generate import Generate
 
 
 def to_source(chunk: dict) -> MinimalSource:
@@ -31,10 +31,12 @@ def iou(a: MinimalSource, b: MinimalSource) -> float:
     """Intersection over union of two character ranges in the same file."""
     if a.file_path != b.file_path:
         return 0.0
-    inter = (min(a.last_character_index, b.last_character_index)
-             - max(a.first_character_index, b.first_character_index))
-    union = (max(a.last_character_index, b.last_character_index)
-             - min(a.first_character_index, b.first_character_index))
+    inter = min(a.last_character_index, b.last_character_index) - max(
+        a.first_character_index, b.first_character_index
+    )
+    union = max(a.last_character_index, b.last_character_index) - min(
+        a.first_character_index, b.first_character_index
+    )
     return max(inter, 0) / union if union > 0 else 0.0
 
 
@@ -56,17 +58,18 @@ class CLI:
         except FileNotFoundError as e:
             print(f"Error: {e}")
             return
-
         results = retriever.search(str(query), k)
         if not results:
             print("No results")
-        print(results)
         for chunk in results:
             print(f"{chunk['file']} [{chunk['start']}:{chunk['end']}]")
 
-    def search_dataset(self, dataset_path: str, k: int = 10,
-                       save_directory: str = "data/output/search_results"
-                       ) -> None:
+    def search_dataset(
+        self,
+        dataset_path: str,
+        k: int = 10,
+        save_directory: str = "data/output/search_results",
+    ) -> None:
         """Search every question of a dataset and save StudentSearchResults."""
         try:
             with open(dataset_path) as f:
@@ -79,11 +82,13 @@ class CLI:
         search_results = []
         for q in tqdm(dataset.rag_questions, desc="Searching", unit=" questions"):
             chunks = retriever.search(q.question, k)
-            search_results.append(MinimalSearchResults(
-                question_id=q.question_id,
-                question=q.question,
-                retrieved_sources=[to_source(c) for c in chunks],
-            ))
+            search_results.append(
+                MinimalSearchResults(
+                    question_id=q.question_id,
+                    question=q.question,
+                    retrieved_sources=[to_source(c) for c in chunks],
+                )
+            )
 
         output = StudentSearchResults(search_results=search_results, k=k)
         os.makedirs(save_directory, exist_ok=True)
@@ -92,14 +97,14 @@ class CLI:
             f.write(output.model_dump_json(indent=2))
         print(f"Saved student_search_results to {save_path}")
 
-
     def answer(self, query: str = "", k: int = 5):
-        result = generate_response(query, k)
+        generator = Generate()
+        result = generator.generate_response(query, k)
         print(result)
 
-
-    def answer_dataset(self, student_search_results_path: str,
-                       save_directory: str) -> None:
+    def answer_dataset(
+        self, student_search_results_path: str, save_directory: str
+    ) -> None:
         """Generate answers for a dataset, producing a StudentSearchResultsAndAnswer JSON file."""
         try:
             with open(student_search_results_path) as f:
@@ -108,26 +113,36 @@ class CLI:
             print(f"Error: could not load {student_search_results_path}: {e}")
             return
 
+        generator = Generate()
         search_results = []
-        for r in results.search_results:
-            answer = generate_response(r.question, k=len(r.retrieved_sources))
-            search_results.append(MinimalAnswer(
-                question_id=r.question_id,
-                question=r.question,
-                retrieved_sources=r.retrieved_sources,
-                answer=answer
-            ))
+        for r in tqdm(results.search_results, desc="Generating", unit=" questions"):
+            answer = generator.generate_response(
+                r.question, k=len(r.retrieved_sources), sources=r.retrieved_sources
+            )
+            search_results.append(
+                MinimalAnswer(
+                    question_id=r.question_id,
+                    question=r.question,
+                    answer=answer,
+                    retrieved_sources=r.retrieved_sources,
+                )
+            )
         k = len(search_results)
         output = StudentSearchResultsAndAnswer(search_results=search_results, k=k)
         os.makedirs(save_directory, exist_ok=True)
-        save_path = os.path.join(save_directory, os.path.basename(student_search_results_path))
+        save_path = os.path.join(
+            save_directory, os.path.basename(student_search_results_path)
+        )
         with open(save_path, "w") as f:
             f.write(output.model_dump_json(indent=2))
         print(f"Saved student_search_results_and_answer to {save_path}")
 
-
-    def evaluate(self, student_search_results_path: str, dataset_path: str,
-                 iou_threshold: float = 0.05) -> None:
+    def evaluate(
+        self,
+        student_search_results_path: str,
+        dataset_path: str,
+        iou_threshold: float = 0.05,
+    ) -> None:
         """Report recall@1/3/5/10 of saved search results vs a ground truth."""
         try:
             with open(student_search_results_path) as f:
@@ -138,10 +153,12 @@ class CLI:
             print(f"Error: {e}")
             return
 
-        truth = {q.question_id: q.sources for q in dataset.rag_questions
-                 if isinstance(q, AnsweredQuestion)}
-        evaluated = [r for r in results.search_results
-                     if truth.get(r.question_id)]
+        truth = {
+            q.question_id: q.sources
+            for q in dataset.rag_questions
+            if isinstance(q, AnsweredQuestion)
+        }
+        evaluated = [r for r in results.search_results if truth.get(r.question_id)]
         if not evaluated:
             print("Error: no question in common with an answered dataset")
             return
@@ -157,5 +174,7 @@ class CLI:
                     for src in expected
                 )
                 total += found / len(expected)
-            print(f"Recall@{k}: {total / len(evaluated):.3f} "
-                  f"({100 * total / len(evaluated):.1f}%)")
+            print(
+                f"Recall@{k}: {total / len(evaluated):.3f} "
+                f"({100 * total / len(evaluated):.1f}%)"
+            )

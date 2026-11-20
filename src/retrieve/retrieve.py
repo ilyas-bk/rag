@@ -6,7 +6,6 @@ from src import INDEX_DIR
 from src.utils import tokenize
 
 
-
 class BM25Retriever:
     """Loads the index built by `index` and ranks chunks for a query.
 
@@ -19,8 +18,9 @@ class BM25Retriever:
     - len(d) / avgdl: long chunks are penalised so they don't win by size (b)
     """
 
-    def __init__(self, index_dir: str = INDEX_DIR,
-                 k1: float = 1.5, b: float = 0.75) -> None:
+    def __init__(
+        self, index_dir: str = INDEX_DIR, k1: float = 1.5, b: float = 0.75
+    ) -> None:
         chunks_path = os.path.join(index_dir, "chunks.json")
         bm25_path = os.path.join(index_dir, "bm25.json")
         if not (os.path.isfile(chunks_path) and os.path.isfile(bm25_path)):

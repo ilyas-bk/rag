@@ -3,7 +3,7 @@ import os
 from collections import Counter, defaultdict
 from tqdm import tqdm
 
-from src import (MAX_CHARS, INDEX_DIR, REPO_PATH)
+from src import MAX_CHARS, INDEX_DIR, REPO_PATH
 from .chunk import chunk_file
 
 from src.utils import tokenize
@@ -30,16 +30,16 @@ def build_bm25(chunks: list[dict]) -> dict:
 
 # Build + save (action)
 
-def build_repository_index(max_chars: int = MAX_CHARS,
-                           repo_path: str = REPO_PATH,
-                           index_dir: str = INDEX_DIR) -> None:
+
+def build_repository_index(
+    max_chars: int = MAX_CHARS, repo_path: str = REPO_PATH, index_dir: str = INDEX_DIR
+) -> None:
     # get valid files
     file_paths = []
     if not os.path.isdir(repo_path):
         raise ValueError(
             f"Couldn't find repository folder in `{repo_path}`! make sure it's created"
-            )
-
+        )
 
     for root, _, files in os.walk(repo_path):
         for f in files:
@@ -69,4 +69,3 @@ def build_repository_index(max_chars: int = MAX_CHARS,
 
 if __name__ == "__main__":
     build_repository_index()
-

@@ -221,3 +221,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# costume files
+
+data/output/
+data/raw/
+data/processed/
+answer_results/

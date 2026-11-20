@@ -1,1 +1,3 @@
-from .generate import generate_response
+from .generate import Generate
+
+__all__ = Generate
