@@ -223,8 +223,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 
-# costume files
-
+# custom files
 data/output/
 data/raw/
 data/processed/

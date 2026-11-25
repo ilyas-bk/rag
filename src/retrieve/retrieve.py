@@ -25,7 +25,8 @@ class BM25Retriever:
         bm25_path = os.path.join(index_dir, "bm25.json")
         if not (os.path.isfile(chunks_path) and os.path.isfile(bm25_path)):
             raise FileNotFoundError(
-                f"No index found in {index_dir}/, run the `index` command first"
+                f"No index found in {index_dir}/, "
+                "run the `index` command first"
             )
 
         with open(chunks_path) as f:

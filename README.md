@@ -1,4 +1,4 @@
-*This project has been created as part of the 42 curriculum by ilyas-bk.*
+*This project has been created as part of the 42 curriculum by ibouelba.*
 
 # RAG against the machine
 

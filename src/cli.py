@@ -16,7 +16,7 @@ from src.data import (
 )
 from src.index import build_repository_index
 from src.retrieve import BM25Retriever
-from src.generate import Generate
+from src.generate import Generate  # this takes time to import
 
 
 def to_source(chunk: dict) -> MinimalSource:
@@ -43,8 +43,10 @@ def iou(a: MinimalSource, b: MinimalSource) -> float:
 class CLI:
     def index(self, max_chunk_size: int = MAX_CHARS) -> None:
         """Chunk data/raw/ and build the BM25 index under data/processed/."""
-        if not isinstance(max_chunk_size, int) or not 0 < max_chunk_size <= MAX_CHARS:
-            print(f"Error: --max_chunk_size must be an integer in 1..{MAX_CHARS}")
+        if not isinstance(max_chunk_size, int) or \
+                not 0 < max_chunk_size <= MAX_CHARS:
+            print("Error: --max_chunk_size must be an "
+                  f"integer in 1..{MAX_CHARS}")
             return
         build_repository_index(max_chunk_size)
 
@@ -80,7 +82,9 @@ class CLI:
             return
 
         search_results = []
-        for q in tqdm(dataset.rag_questions, desc="Searching", unit=" questions"):
+        for q in tqdm(dataset.rag_questions,
+                      desc="Searching",
+                      unit=" questions"):
             chunks = retriever.search(q.question, k)
             search_results.append(
                 MinimalSearchResults(
@@ -92,12 +96,13 @@ class CLI:
 
         output = StudentSearchResults(search_results=search_results, k=k)
         os.makedirs(save_directory, exist_ok=True)
-        save_path = os.path.join(save_directory, os.path.basename(dataset_path))
+        save_path = os.path.join(save_directory,
+                                 os.path.basename(dataset_path))
         with open(save_path, "w") as f:
             f.write(output.model_dump_json(indent=2))
         print(f"Saved student_search_results to {save_path}")
 
-    def answer(self, query: str = "", k: int = 5):
+    def answer(self, query: str = "", k: int = 5) -> None:
         generator = Generate()
         result = generator.generate_response(query, k)
         print(result)
@@ -105,7 +110,8 @@ class CLI:
     def answer_dataset(
         self, student_search_results_path: str, save_directory: str
     ) -> None:
-        """Generate answers for a dataset, producing a StudentSearchResultsAndAnswer JSON file."""
+        """Generate answers for a dataset,
+            producing a StudentSearchResultsAndAnswer JSON file."""
         try:
             with open(student_search_results_path) as f:
                 results = StudentSearchResults.model_validate(json.load(f))
@@ -115,20 +121,27 @@ class CLI:
 
         generator = Generate()
         search_results = []
-        for r in tqdm(results.search_results, desc="Generating", unit=" questions"):
+        for r in tqdm(results.search_results,
+                      desc="Generating",
+                      unit=" questions"):
             answer = generator.generate_response(
-                r.question, k=len(r.retrieved_sources), sources=r.retrieved_sources
+                r.question,
+                k=len(r.retrieved_sources),
+                sources=r.retrieved_sources
             )
             search_results.append(
                 MinimalAnswer(
                     question_id=r.question_id,
                     question=r.question,
-                    answer=answer,
+                    answer=answer or "",
                     retrieved_sources=r.retrieved_sources,
                 )
             )
         k = len(search_results)
-        output = StudentSearchResultsAndAnswer(search_results=search_results, k=k)
+        output = StudentSearchResultsAndAnswer(
+            search_results=search_results,
+            k=k
+        )
         os.makedirs(save_directory, exist_ok=True)
         save_path = os.path.join(
             save_directory, os.path.basename(student_search_results_path)
@@ -158,7 +171,8 @@ class CLI:
             for q in dataset.rag_questions
             if isinstance(q, AnsweredQuestion)
         }
-        evaluated = [r for r in results.search_results if truth.get(r.question_id)]
+        evaluated = [r for r in results.search_results
+                     if truth.get(r.question_id)]
         if not evaluated:
             print("Error: no question in common with an answered dataset")
             return

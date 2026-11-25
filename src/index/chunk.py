@@ -28,20 +28,26 @@ def split_by_lines(
             or (is_boundary(line) and size >= max_chars * min_fill)
         ):
             chunks.append(
-                {"start": chunk_start, "end": pos, "text": text[chunk_start:pos]}
+                {"start": chunk_start,
+                 "end": pos,
+                 "text": text[chunk_start:pos]}
             )
             chunk_start = pos
         while pos + len(line) - chunk_start > max_chars:
             cut = chunk_start + max_chars
             chunks.append(
-                {"start": chunk_start, "end": cut, "text": text[chunk_start:cut]}
+                {"start": chunk_start,
+                 "end": cut,
+                 "text": text[chunk_start:cut]}
             )
             chunk_start = cut
         pos += len(line)
 
     if chunk_start < len(text):
         chunks.append(
-            {"start": chunk_start, "end": len(text), "text": text[chunk_start:]}
+            {"start": chunk_start,
+             "end": len(text),
+             "text": text[chunk_start:]}
         )
     return chunks
 
@@ -71,12 +77,16 @@ def split_plain_text(text: str, max_chars: int = MAX_CHARS) -> list[dict]:
 
 
 def chunk_file(args: tuple[str, int]) -> list[dict]:
-    """Router function that sends files to the correct splitter based on extension."""
+    """Router function that sends files to the
+    correct splitter based on extension."""
     file_path, max_chars = args
     _, ext = os.path.splitext(file_path)
 
     try:
-        with open(file_path, "r", encoding="utf-8", errors="ignore", newline="") as f:
+        with open(file_path, "r",
+                  encoding="utf-8",
+                  errors="ignore",
+                  newline="") as f:
             content = f.read()
     except OSError as e:
         print(f"Skipping {file_path}: {e}")
@@ -93,5 +103,6 @@ def chunk_file(args: tuple[str, int]) -> list[dict]:
         raw_chunks = split_plain_text(content, max_chars)
 
     return [
-        {"file": file_path, **chunk} for chunk in raw_chunks if chunk["text"].strip()
+        {"file": file_path, **chunk}
+        for chunk in raw_chunks if chunk["text"].strip()
     ]

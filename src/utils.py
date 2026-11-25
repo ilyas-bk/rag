@@ -1,6 +1,4 @@
 import re
-import mimetypes
-from pathlib import Path
 
 
 def tokenize(text: str) -> list[str]:
@@ -13,7 +11,9 @@ def tokenize(text: str) -> list[str]:
     for word in re.findall(r"[A-Za-z_][A-Za-z0-9_]*|\d+", text):
         lower = word.lower()
         terms.append(lower)
-        parts = re.findall(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+", word)
+        parts = re.findall(
+            r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+",
+            word)
         if len(parts) > 1:
             terms.extend(p.lower() for p in parts)
     return terms

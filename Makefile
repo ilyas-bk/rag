@@ -1,57 +1,46 @@
-query := "what is openai"
-chunk_size := 2000
-k := 5
+PYTHON  := uv run python
+SRC     := src
+ARGS    ?= index
 
-file_type := docs
+.DEFAULT_GOAL := help
+.PHONY: help install run debug lint lint-strict clean fclean
 
-dataset_path := data/datasets/AnsweredQuestions/dataset_$(file_type)_public.json
-search_save_directory := data/output/search_results
-answer_save_directory := answer_results
-
-student_search_results_path := data/output/search_results/dataset_$(file_type)_public.json
-
+help:
+	@echo "Targets:"
+	@echo "  install      sync dependencies with uv"
+	@echo "  run          run the app (override with ARGS=..., e.g. make run ARGS='search')"
+	@echo "  debug        run the app under pdb"
+	@echo "  lint         flake8 + mypy"
+	@echo "  lint-strict  flake8 + mypy --strict"
+	@echo "  clean        remove caches and bytecode"
+	@echo "  fclean       clean + remove the virtualenv"
 
 install:
 	uv sync
 
+run: install
+	$(PYTHON) -m $(SRC) $(ARGS)
 
-run:
-	python -m src index
+debug: install
+	$(PYTHON) -m pdb -m $(SRC) $(ARGS)
 
+lint: install
+	uv run flake8 $(SRC)
+	uv run mypy $(SRC) \
+		--warn-return-any \
+		--warn-unused-ignores \
+		--ignore-missing-imports \
+		--disallow-untyped-defs \
+		--check-untyped-defs
 
-debug:
-	python -m pdb -m src index
-
+lint-strict: install
+	uv run flake8 $(SRC)
+	uv run mypy $(SRC) --strict
 
 clean:
-	rm -rf .mypy_cache
+	rm -rf .mypy_cache .pytest_cache .ruff_cache
+	find . -type d -name "__pycache__" -not -path "./.venv/*" -prune -exec rm -rf {} +
+	find . -type f -name "*.pyc" -not -path "./.venv/*" -delete
 
-
-lint:
-	flake8 src and mypy src --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
-
-
-# costume make commands
-index:
-	python -m src index -max_chunk_size $(chunk_size)
-
-
-search:
-	python -m src search $(query)
-
-
-search_dataset:
-	python -m src search_dataset -dataset_path $(dataset_path) -k $(k) -save_directory $(search_save_directory)
-
-
-answer:
-	python -m src answer $(query) -k $(k)
-
-
-answer_dataset:
-	python -m src answer_dataset -student_search_results_path $(student_search_results_path) -save_directory $(answer_save_directory)
-
-
-evaluate:
-	python -m src evaluate -student_search_results_path $(student_search_results_path) -dataset_path $(dataset_path)
-
+fclean: clean
+	rm -rf .venv
