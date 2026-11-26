@@ -1,3 +1,5 @@
+"""Retrieval: rank the indexed chunks of a query with BM25."""
+
 import json
 import math
 import os
@@ -16,11 +18,26 @@ class BM25Retriever:
     - idf(t): rare terms ("load_lora_adapter") weigh more than common ones
     - tf: how often t appears in d, with diminishing returns (k1)
     - len(d) / avgdl: long chunks are penalised so they don't win by size (b)
+
+    Parameters
+    ----------
+    index_dir : str, default INDEX_DIR
+        Directory holding ``chunks.json`` and ``bm25.json``.
+    k1 : float, default 1.5
+        Term frequency saturation.
+    b : float, default 0.75
+        Strength of the chunk length normalisation.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the index files are missing (run the ``index`` command first).
     """
 
     def __init__(
         self, index_dir: str = INDEX_DIR, k1: float = 1.5, b: float = 0.75
     ) -> None:
+        """Load the index files (see the class docstring)."""
         chunks_path = os.path.join(index_dir, "chunks.json")
         bm25_path = os.path.join(index_dir, "bm25.json")
         if not (os.path.isfile(chunks_path) and os.path.isfile(bm25_path)):
@@ -49,7 +66,21 @@ class BM25Retriever:
         }
 
     def search(self, query: str, k: int = 5) -> list[dict]:
-        """Return the k best chunks for the query, best first."""
+        """Return the ``k`` best chunks for a query, best first.
+
+        Parameters
+        ----------
+        query : str
+            The question to search for.
+        k : int, default 5
+            Number of chunks to return.
+
+        Returns
+        -------
+        list of dict
+            Chunks with the keys ``file``, ``start``, ``end`` and
+            ``text``. Empty if ``k`` is not positive or no term matches.
+        """
         if k <= 0:
             return []
 

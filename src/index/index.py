@@ -1,3 +1,5 @@
+"""Indexing: build and persist the BM25 index of the corpus."""
+
 import json
 import os
 from collections import Counter, defaultdict
@@ -11,6 +13,20 @@ from src.utils import tokenize
 
 
 class BM25Index(TypedDict):
+    """Serialisable BM25 inverted index.
+
+    Attributes
+    ----------
+    N : int
+        Number of indexed chunks.
+    avgdl : float
+        Average chunk length, in terms.
+    lengths : list of int
+        Length of every chunk, in terms, indexed by chunk id.
+    postings : dict
+        Maps a term to ``{chunk_id: term frequency}``.
+    """
+
     N: int
     avgdl: float
     lengths: list[int]
@@ -18,7 +34,20 @@ class BM25Index(TypedDict):
 
 
 def build_bm25(chunks: list[dict[str, str]]) -> BM25Index:
-    """Build an inverted index: term -> {chunk_id: term frequency}."""
+    """Build an inverted index: term -> {chunk_id: term frequency}.
+
+    The file path of each chunk is indexed along with its text.
+
+    Parameters
+    ----------
+    chunks : list of dict
+        Chunks with at least the keys ``text`` and ``file``.
+
+    Returns
+    -------
+    BM25Index
+        The index, ready to be dumped to JSON.
+    """
     postings: dict[str, dict[int, int]] = defaultdict(dict)
     lengths: list[int] = []
 
@@ -43,6 +72,26 @@ def build_repository_index(
     repo_path: str = REPO_PATH,
     index_dir: str = INDEX_DIR,
 ) -> None:
+    """Chunk the repository and persist the BM25 index.
+
+    Every ``.py``, ``.md`` and ``.txt`` file under ``repo_path`` is
+    chunked, then ``chunks.json`` and ``bm25.json`` are written to
+    ``index_dir``.
+
+    Parameters
+    ----------
+    max_chars : int, default MAX_CHARS
+        Maximum number of characters of a chunk.
+    repo_path : str, default REPO_PATH
+        Root of the corpus to ingest.
+    index_dir : str, default INDEX_DIR
+        Directory where the index files are written.
+
+    Raises
+    ------
+    ValueError
+        If ``repo_path`` is not a directory or yields no chunk.
+    """
     # Get valid files.
     file_paths: list[str] = []
     if not os.path.isdir(repo_path):

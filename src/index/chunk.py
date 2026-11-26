@@ -1,3 +1,5 @@
+"""Chunking strategies: Python code, Markdown and plain text."""
+
 from typing import Callable
 import os
 
@@ -10,12 +12,31 @@ def split_by_lines(
     is_boundary: Callable[[str], bool],
     min_fill: float = 0.5,
 ) -> list[dict]:
-    """Group lines into chunks of at most max_chars.
+    """Group lines into chunks of at most ``max_chars`` characters.
 
-    A new chunk starts when adding the line would overflow, or when the line
-    is a "natural boundary" (def/class, heading, blank line...) and the
-    current chunk is already at least min_fill full. A single line longer
-    than max_chars is cut into max_chars-sized pieces.
+    A new chunk starts when adding the line would overflow, or when the
+    line is a "natural boundary" (def/class, heading, blank line...) and
+    the current chunk is already at least ``min_fill`` full. A single
+    line longer than ``max_chars`` is cut into ``max_chars``-sized
+    pieces.
+
+    Parameters
+    ----------
+    text : str
+        The full text to split.
+    max_chars : int
+        Maximum number of characters of a chunk.
+    is_boundary : callable
+        Takes a line and returns True if a new chunk may start there.
+    min_fill : float, default 0.5
+        Fraction of ``max_chars`` a chunk must reach before a boundary
+        line is allowed to start a new chunk.
+
+    Returns
+    -------
+    list of dict
+        Chunks with the keys ``start`` and ``end`` (character range in
+        ``text``) and ``text``.
     """
     chunks = []
     chunk_start = 0
@@ -53,7 +74,20 @@ def split_by_lines(
 
 
 def split_python_code(text: str, max_chars: int = MAX_CHARS) -> list[dict]:
-    """Split python files primarily by top-level blocks (def/class)."""
+    """Split Python source primarily by top-level blocks (def/class).
+
+    Parameters
+    ----------
+    text : str
+        The content of a Python file.
+    max_chars : int, default MAX_CHARS
+        Maximum number of characters of a chunk.
+
+    Returns
+    -------
+    list of dict
+        Chunks with the keys ``start``, ``end`` and ``text``.
+    """
     return split_by_lines(
         text,
         max_chars,
@@ -62,7 +96,20 @@ def split_python_code(text: str, max_chars: int = MAX_CHARS) -> list[dict]:
 
 
 def split_markdown(text: str, max_chars: int = MAX_CHARS) -> list[dict]:
-    """Split markdown files by headings to keep document sections together."""
+    """Split Markdown by headings to keep document sections together.
+
+    Parameters
+    ----------
+    text : str
+        The content of a Markdown file.
+    max_chars : int, default MAX_CHARS
+        Maximum number of characters of a chunk.
+
+    Returns
+    -------
+    list of dict
+        Chunks with the keys ``start``, ``end`` and ``text``.
+    """
     return split_by_lines(
         text,
         max_chars,
@@ -72,13 +119,41 @@ def split_markdown(text: str, max_chars: int = MAX_CHARS) -> list[dict]:
 
 
 def split_plain_text(text: str, max_chars: int = MAX_CHARS) -> list[dict]:
-    """Split regular text files by paragraphs (blank lines)."""
+    """Split plain text by paragraphs (blank lines).
+
+    Parameters
+    ----------
+    text : str
+        The content of a text file.
+    max_chars : int, default MAX_CHARS
+        Maximum number of characters of a chunk.
+
+    Returns
+    -------
+    list of dict
+        Chunks with the keys ``start``, ``end`` and ``text``.
+    """
     return split_by_lines(text, max_chars, lambda line: line.strip() == "")
 
 
 def chunk_file(args: tuple[str, int]) -> list[dict]:
-    """Router function that sends files to the
-    correct splitter based on extension."""
+    """Read a file and split it with the splitter fitting its extension.
+
+    ``.py`` files use :func:`split_python_code`, ``.md`` files use
+    :func:`split_markdown` and any other file is split as plain text.
+    Unreadable and blank files are skipped.
+
+    Parameters
+    ----------
+    args : tuple of (str, int)
+        The file path and the maximum chunk size in characters.
+
+    Returns
+    -------
+    list of dict
+        Non-blank chunks with the keys ``file``, ``start``, ``end`` and
+        ``text``. Empty if the file cannot be read or is blank.
+    """
     file_path, max_chars = args
     _, ext = os.path.splitext(file_path)
 

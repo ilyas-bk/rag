@@ -1,3 +1,5 @@
+"""Answer generation with Qwen3 from retrieved context."""
+
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -9,11 +11,29 @@ from src.data import MinimalSource
 
 
 def extract_sources(sources: List[MinimalSource]) -> list[dict]:
+    """Read the text of every source from the corpus.
 
+    Files are opened exactly like the chunker opens them (UTF-8, errors
+    ignored, no newline translation) so that character offsets match.
+
+    Parameters
+    ----------
+    sources : list of MinimalSource
+        The source locations to read.
+
+    Returns
+    -------
+    list of dict
+        One ``{"text": ...}`` entry per source, in order. Empty if one
+        of the files cannot be read.
+    """
     result = []
     for s in sources:
         try:
-            with open(s.file_path) as f:
+            with open(s.file_path, "r",
+                      encoding="utf-8",
+                      errors="ignore",
+                      newline="") as f:
                 content = f.read()
         except (OSError, FileNotFoundError):
             return []
@@ -24,9 +44,23 @@ def extract_sources(sources: List[MinimalSource]) -> list[dict]:
 
 
 class Generate:
+    """Answer questions from retrieved sources with a local causal LM.
 
-    def __init__(self, model_name: str = "Qwen/Qwen3-0.6b"):
+    Parameters
+    ----------
+    model_name : str, default "Qwen/Qwen3-0.6b"
+        Hugging Face id of the model, loaded once at construction.
 
+    Attributes
+    ----------
+    tokenizer : transformers.PreTrainedTokenizerBase
+        Tokenizer of the model.
+    model : transformers.PreTrainedModel
+        The loaded model.
+    """
+
+    def __init__(self, model_name: str = "Qwen/Qwen3-0.6b") -> None:
+        """Load the tokenizer and the model (see the class docstring)."""
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model: Any = AutoModelForCausalLM.from_pretrained(
             model_name, dtype=torch.bfloat16, device_map="auto"
@@ -35,8 +69,29 @@ class Generate:
     def generate_response(self,
                           query: str = "",
                           k: int = 5,
-                          sources: List = []) -> Optional[str]:
+                          sources: Optional[List[MinimalSource]] = None
+                          ) -> Optional[str]:
+        """Generate an answer to ``query`` grounded in ``sources``.
 
+        Parameters
+        ----------
+        query : str, default ""
+            The question to answer.
+        k : int, default 5
+            Number of sources requested (kept for the CLI interface; the
+            number of sources actually used is ``len(sources)``).
+        sources : list of MinimalSource, optional
+            Retrieved sources whose text is given to the model as
+            context.
+
+        Returns
+        -------
+        str or None
+            The generated answer, or an error message if the query is
+            empty or the sources cannot be read.
+        """
+        if sources is None:
+            sources = []
         if not str(query).strip():
             return "Error: the query is empty"
         chunks = extract_sources(sources)

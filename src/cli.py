@@ -1,3 +1,5 @@
+"""Command-line interface of the RAG system, built with Fire."""
+
 import json
 import os
 
@@ -20,6 +22,18 @@ from src.generate import Generate  # this takes time to import
 
 
 def to_source(chunk: dict) -> MinimalSource:
+    """Convert an indexed chunk into a :class:`MinimalSource`.
+
+    Parameters
+    ----------
+    chunk : dict
+        Chunk with the keys ``file``, ``start`` and ``end``.
+
+    Returns
+    -------
+    MinimalSource
+        The source location covered by the chunk.
+    """
     return MinimalSource(
         file_path=chunk["file"],
         first_character_index=chunk["start"],
@@ -28,7 +42,21 @@ def to_source(chunk: dict) -> MinimalSource:
 
 
 def iou(a: MinimalSource, b: MinimalSource) -> float:
-    """Intersection over union of two character ranges in the same file."""
+    """Compute the intersection over union of two character ranges.
+
+    Parameters
+    ----------
+    a : MinimalSource
+        First source.
+    b : MinimalSource
+        Second source.
+
+    Returns
+    -------
+    float
+        The IoU in ``[0, 1]``; 0.0 if the files differ or the ranges do
+        not overlap.
+    """
     if a.file_path != b.file_path:
         return 0.0
     inter = min(a.last_character_index, b.last_character_index) - max(
@@ -41,8 +69,18 @@ def iou(a: MinimalSource, b: MinimalSource) -> float:
 
 
 class CLI:
+    """Commands exposed by Python Fire: ``python -m src <command>``."""
+
     def index(self, max_chunk_size: int = MAX_CHARS) -> None:
-        """Chunk data/raw/ and build the BM25 index under data/processed/."""
+        """Chunk ``data/raw/`` and build the BM25 index.
+
+        The index is written under ``data/processed/``.
+
+        Parameters
+        ----------
+        max_chunk_size : int, default MAX_CHARS
+            Maximum chunk size in characters, between 1 and MAX_CHARS.
+        """
         if not isinstance(max_chunk_size, int) or \
                 not 0 < max_chunk_size <= MAX_CHARS:
             print("Error: --max_chunk_size must be an "
@@ -51,7 +89,15 @@ class CLI:
         build_repository_index(max_chunk_size)
 
     def search(self, query: str = "", k: int = 5) -> None:
-        """Print the top-k sources for a single query."""
+        """Print the top-k sources for a single query.
+
+        Parameters
+        ----------
+        query : str
+            The question to search for.
+        k : int, default 5
+            Number of sources to print.
+        """
         if not str(query).strip():
             print("Error: the query is empty")
             return
@@ -72,7 +118,20 @@ class CLI:
         k: int = 10,
         save_directory: str = "data/output/search_results",
     ) -> None:
-        """Search every question of a dataset and save StudentSearchResults."""
+        """Search every question of a dataset and save the results.
+
+        The output is a ``StudentSearchResults`` JSON file named like the
+        dataset file.
+
+        Parameters
+        ----------
+        dataset_path : str
+            Path of the JSON dataset of questions.
+        k : int, default 10
+            Number of sources retrieved per question.
+        save_directory : str, default "data/output/search_results"
+            Directory where the output file is written.
+        """
         try:
             with open(dataset_path) as f:
                 dataset = RagDataset.model_validate(json.load(f))
@@ -103,15 +162,45 @@ class CLI:
         print(f"Saved student_search_results to {save_path}")
 
     def answer(self, query: str = "", k: int = 5) -> None:
+        """Answer a single query using the retrieved context.
+
+        Parameters
+        ----------
+        query : str
+            The question to answer.
+        k : int, default 5
+            Number of sources retrieved and given to the model.
+        """
+        if not str(query).strip():
+            print("Error: the query is empty")
+            return
+        try:
+            retriever = BM25Retriever()
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            return
+        sources = [to_source(c) for c in retriever.search(str(query), k)]
+        if not sources:
+            print("No results")
+            return
         generator = Generate()
-        result = generator.generate_response(query, k)
-        print(result)
+        print(generator.generate_response(str(query), k, sources))
 
     def answer_dataset(
         self, student_search_results_path: str, save_directory: str
     ) -> None:
-        """Generate answers for a dataset,
-            producing a StudentSearchResultsAndAnswer JSON file."""
+        """Generate answers for a dataset of search results.
+
+        The output is a ``StudentSearchResultsAndAnswer`` JSON file named
+        like the input file.
+
+        Parameters
+        ----------
+        student_search_results_path : str
+            Path of a ``StudentSearchResults`` JSON file.
+        save_directory : str
+            Directory where the output file is written.
+        """
         try:
             with open(student_search_results_path) as f:
                 results = StudentSearchResults.model_validate(json.load(f))
@@ -137,10 +226,9 @@ class CLI:
                     retrieved_sources=r.retrieved_sources,
                 )
             )
-        k = len(search_results)
         output = StudentSearchResultsAndAnswer(
             search_results=search_results,
-            k=k
+            k=results.k
         )
         os.makedirs(save_directory, exist_ok=True)
         save_path = os.path.join(
@@ -156,7 +244,21 @@ class CLI:
         dataset_path: str,
         iou_threshold: float = 0.05,
     ) -> None:
-        """Report recall@1/3/5/10 of saved search results vs a ground truth."""
+        """Report recall@1/3/5/10 of saved search results.
+
+        Results are compared with a ground-truth dataset; a source counts
+        as found when a retrieved one overlaps it with an IoU above the
+        threshold.
+
+        Parameters
+        ----------
+        student_search_results_path : str
+            Path of a ``StudentSearchResults`` JSON file.
+        dataset_path : str
+            Path of the ``AnsweredQuestions`` ground-truth dataset.
+        iou_threshold : float, default 0.05
+            Minimum IoU for a retrieved source to match an expected one.
+        """
         try:
             with open(student_search_results_path) as f:
                 results = StudentSearchResults.model_validate(json.load(f))
